@@ -1,10 +1,24 @@
--- KingOS Universal | Para Delta
--- OWN GAME BY KING OS
+--[[
+	KingOS Universal v2.0 | For Delta
+	OWN GAME BY KING OS
+
+	Tabs: Player, World, Themes, Misc
+	Hide/show the panel: RightShift or the round "K" button
+]]
+
+local env = (getgenv and getgenv()) or _G
+if env.KingOS_Unload then
+	pcall(env.KingOS_Unload)
+end
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -13,418 +27,993 @@ if playerGui:FindFirstChild("KingOS") then
 	playerGui.KingOS:Destroy()
 end
 
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "KingOS"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = playerGui
+-- ====================== THEMES ======================
+local THEMES = {
+	Purple = {
+		accent = Color3.fromRGB(140, 50, 255), onAccent = Color3.fromRGB(255, 255, 255),
+		bg = Color3.fromRGB(18, 18, 28), bg2 = Color3.fromRGB(28, 28, 42), bg3 = Color3.fromRGB(46, 46, 68),
+		text = Color3.fromRGB(255, 255, 255), gray = Color3.fromRGB(160, 160, 175),
+	},
+	Ocean = {
+		accent = Color3.fromRGB(0, 170, 255), onAccent = Color3.fromRGB(255, 255, 255),
+		bg = Color3.fromRGB(10, 20, 32), bg2 = Color3.fromRGB(18, 34, 52), bg3 = Color3.fromRGB(30, 56, 82),
+		text = Color3.fromRGB(240, 250, 255), gray = Color3.fromRGB(150, 175, 195),
+	},
+	Crimson = {
+		accent = Color3.fromRGB(235, 50, 70), onAccent = Color3.fromRGB(255, 255, 255),
+		bg = Color3.fromRGB(24, 14, 16), bg2 = Color3.fromRGB(38, 22, 26), bg3 = Color3.fromRGB(64, 36, 42),
+		text = Color3.fromRGB(255, 240, 240), gray = Color3.fromRGB(190, 155, 160),
+	},
+	Emerald = {
+		accent = Color3.fromRGB(40, 200, 120), onAccent = Color3.fromRGB(255, 255, 255),
+		bg = Color3.fromRGB(12, 24, 20), bg2 = Color3.fromRGB(20, 38, 32), bg3 = Color3.fromRGB(34, 62, 52),
+		text = Color3.fromRGB(240, 255, 248), gray = Color3.fromRGB(150, 185, 170),
+	},
+	Sunset = {
+		accent = Color3.fromRGB(255, 140, 50), onAccent = Color3.fromRGB(30, 15, 5),
+		bg = Color3.fromRGB(28, 18, 18), bg2 = Color3.fromRGB(44, 28, 26), bg3 = Color3.fromRGB(72, 46, 40),
+		text = Color3.fromRGB(255, 245, 235), gray = Color3.fromRGB(195, 165, 150),
+	},
+	Midnight = {
+		accent = Color3.fromRGB(120, 130, 255), onAccent = Color3.fromRGB(255, 255, 255),
+		bg = Color3.fromRGB(8, 8, 14), bg2 = Color3.fromRGB(16, 16, 26), bg3 = Color3.fromRGB(30, 30, 46),
+		text = Color3.fromRGB(235, 235, 255), gray = Color3.fromRGB(140, 140, 165),
+	},
+	Light = {
+		accent = Color3.fromRGB(90, 90, 240), onAccent = Color3.fromRGB(255, 255, 255),
+		bg = Color3.fromRGB(242, 242, 250), bg2 = Color3.fromRGB(226, 226, 240), bg3 = Color3.fromRGB(204, 204, 226),
+		text = Color3.fromRGB(25, 25, 40), gray = Color3.fromRGB(100, 100, 125),
+	},
+}
+local THEME_ORDER = { "Purple", "Ocean", "Crimson", "Emerald", "Sunset", "Midnight", "Light" }
 
--- Colores
-local PRIMARY = Color3.fromRGB(140, 50, 255)
-local PRIMARY_DARK = Color3.fromRGB(90, 30, 180)
-local BG = Color3.fromRGB(18, 18, 28)
-local BG2 = Color3.fromRGB(28, 28, 42)
-local TEXT = Color3.fromRGB(255, 255, 255)
-local GRAY = Color3.fromRGB(160, 160, 175)
+local SAVE_FILE = "KingOS_theme.txt"
+local currentTheme = "Purple"
+pcall(function()
+	if isfile and readfile and isfile(SAVE_FILE) then
+		local saved = readfile(SAVE_FILE)
+		if THEMES[saved] then
+			currentTheme = saved
+		end
+	end
+end)
+local T = THEMES[currentTheme]
 
--- ====================== INTRO ======================
-local introFrame = Instance.new("Frame")
-introFrame.Size = UDim2.new(1, 0, 1, 0)
-introFrame.BackgroundTransparency = 1
-introFrame.Parent = screenGui
+-- Every themed element registers a function here; applying a theme re-runs them all.
+local binders = {}
+local function refreshAll()
+	for _, fn in ipairs(binders) do
+		pcall(fn)
+	end
+end
+local function bind(fn)
+	pcall(fn)
+	table.insert(binders, fn)
+end
+local function applyTheme(name)
+	if not THEMES[name] then return end
+	currentTheme = name
+	T = THEMES[name]
+	pcall(function()
+		if writefile then
+			writefile(SAVE_FILE, name)
+		end
+	end)
+	refreshAll()
+end
 
-local introLabel = Instance.new("TextLabel")
-introLabel.Size = UDim2.new(0.9, 0, 0.2, 0)
-introLabel.Position = UDim2.new(0.05, 0, 0.4, 0)
-introLabel.BackgroundTransparency = 1
-introLabel.Text = "KingOS Universal\nOWN GAME BY KING OS"
-introLabel.TextColor3 = TEXT
-introLabel.TextScaled = true
-introLabel.Font = Enum.Font.GothamBold
-introLabel.TextStrokeTransparency = 0.3
-introLabel.Parent = introFrame
+-- ====================== HELPERS ======================
+local conns = {}
+local function track(c)
+	table.insert(conns, c)
+	return c
+end
 
--- ====================== PANEL PRINCIPAL ======================
-local mainPanel = Instance.new("Frame")
-mainPanel.Size = UDim2.new(0, 360, 0, 440)
-mainPanel.Position = UDim2.new(0.5, -180, 0.5, -220)
-mainPanel.BackgroundColor3 = BG
-mainPanel.BorderSizePixel = 0
-mainPanel.Visible = false
-mainPanel.Active = true
-mainPanel.Parent = screenGui
+local function new(class, props, parent)
+	local o = Instance.new(class)
+	for k, v in pairs(props) do
+		o[k] = v
+	end
+	if parent then
+		o.Parent = parent
+	end
+	return o
+end
 
-Instance.new("UICorner", mainPanel).CornerRadius = UDim.new(0, 16)
+local function corner(p, r)
+	return new("UICorner", { CornerRadius = UDim.new(0, r or 8) }, p)
+end
 
-local mainStroke = Instance.new("UIStroke", mainPanel)
-mainStroke.Color = PRIMARY
-mainStroke.Thickness = 2.5
-mainStroke.Transparency = 0.15
+local function stroke(p, th)
+	return new("UIStroke", { Thickness = th or 1.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, p)
+end
 
--- Barra superior para arrastrar
-local topBar = Instance.new("Frame")
-topBar.Size = UDim2.new(1, 0, 0, 42)
-topBar.BackgroundColor3 = BG2
-topBar.BorderSizePixel = 0
-topBar.Parent = mainPanel
-Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 16)
+local orderCounter = 0
+local function nextOrder()
+	orderCounter += 1
+	return orderCounter
+end
 
-local topBarFix = Instance.new("Frame")
-topBarFix.Size = UDim2.new(1, 0, 0, 20)
-topBarFix.Position = UDim2.new(0, 0, 1, -20)
-topBarFix.BackgroundColor3 = BG2
-topBarFix.BorderSizePixel = 0
-topBarFix.Parent = topBar
+local function isPointer(input)
+	return input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch
+end
 
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 1, 0)
-title.Position = UDim2.new(0, 12, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "KingOS  •  Universal"
-title.TextColor3 = TEXT
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = topBar
+-- ====================== STATE ======================
+local S = {
+	speedOn = false, speed = 50,
+	jumpOn = false, jump = 100,
+	infJump = false,
+	noclip = false,
+	fly = false, flySpeed = 60,
+	fov = nil,
+	fullbright = false,
+	noFog = false,
+	antiAfk = true,
+	rainbow = false,
+}
 
--- Título de opciones
-local optionsTitle = Instance.new("TextLabel")
-optionsTitle.Size = UDim2.new(1, -24, 0, 50)
-optionsTitle.Position = UDim2.new(0, 12, 0, 48)
-optionsTitle.BackgroundTransparency = 1
-optionsTitle.Text = "Aquí están sus opciones\nHere are your options"
-optionsTitle.TextColor3 = TEXT
-optionsTitle.TextScaled = true
-optionsTitle.Font = Enum.Font.GothamBold
-optionsTitle.Parent = mainPanel
+local function getHum()
+	local c = player.Character
+	return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot()
+	local c = player.Character
+	return c and c:FindFirstChild("HumanoidRootPart")
+end
 
--- Pestañas
-local tabHolder = Instance.new("Frame")
-tabHolder.Size = UDim2.new(1, -24, 0, 36)
-tabHolder.Position = UDim2.new(0, 12, 0, 105)
-tabHolder.BackgroundTransparency = 1
-tabHolder.Parent = mainPanel
+local startHum = getHum()
+local origWalk = startHum and startHum.WalkSpeed or 16
+local origJump = startHum and startHum.JumpPower or 50
+local origGravity = Workspace.Gravity
+local lightOrig = {
+	Brightness = Lighting.Brightness,
+	Ambient = Lighting.Ambient,
+	OutdoorAmbient = Lighting.OutdoorAmbient,
+	GlobalShadows = Lighting.GlobalShadows,
+	FogEnd = Lighting.FogEnd,
+}
+local function restoreLight(keys)
+	for _, k in ipairs(keys) do
+		pcall(function()
+			Lighting[k] = lightOrig[k]
+		end)
+	end
+end
 
-local tabJugador = Instance.new("TextButton")
-tabJugador.Size = UDim2.new(0.5, -6, 1, 0)
-tabJugador.BackgroundColor3 = PRIMARY
-tabJugador.Text = "Jugador"
-tabJugador.TextColor3 = TEXT
-tabJugador.Font = Enum.Font.GothamBold
-tabJugador.TextSize = 15
-tabJugador.Parent = tabHolder
-Instance.new("UICorner", tabJugador).CornerRadius = UDim.new(0, 9)
+-- ====================== GUI ROOT ======================
+local gui = new("ScreenGui", {
+	Name = "KingOS",
+	ResetOnSpawn = false,
+	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	DisplayOrder = 999,
+	IgnoreGuiInset = true,
+}, playerGui)
 
-local tabProx = Instance.new("TextButton")
-tabProx.Size = UDim2.new(0.5, -6, 1, 0)
-tabProx.Position = UDim2.new(0.5, 6, 0, 0)
-tabProx.BackgroundColor3 = BG2
-tabProx.Text = "Próximamente"
-tabProx.TextColor3 = GRAY
-tabProx.Font = Enum.Font.GothamBold
-tabProx.TextSize = 15
-tabProx.Parent = tabHolder
-Instance.new("UICorner", tabProx).CornerRadius = UDim.new(0, 9)
+-- ====================== NOTIFICATIONS ======================
+local toastHolder = new("Frame", {
+	Size = UDim2.new(0, 250, 1, -20),
+	Position = UDim2.new(0, 14, 0, 10),
+	BackgroundTransparency = 1,
+}, gui)
+new("UIListLayout", {
+	VerticalAlignment = Enum.VerticalAlignment.Bottom,
+	Padding = UDim.new(0, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, toastHolder)
 
--- Contenido
-local content = Instance.new("Frame")
-content.Size = UDim2.new(1, -24, 1, -160)
-content.Position = UDim2.new(0, 12, 0, 150)
-content.BackgroundTransparency = 1
-content.Parent = mainPanel
+local function notify(text)
+	local f = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 38),
+		BackgroundColor3 = T.bg2,
+		LayoutOrder = nextOrder(),
+	}, toastHolder)
+	corner(f, 10)
+	local st = stroke(f, 1.5)
+	st.Color = T.accent
+	local l = new("TextLabel", {
+		Size = UDim2.new(1, -16, 1, 0),
+		Position = UDim2.new(0, 8, 0, 0),
+		BackgroundTransparency = 1,
+		Text = text,
+		TextColor3 = T.text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	}, f)
+	task.delay(2.5, function()
+		if not f.Parent then return end
+		local info = TweenInfo.new(0.4)
+		TweenService:Create(f, info, { BackgroundTransparency = 1 }):Play()
+		TweenService:Create(l, info, { TextTransparency = 1 }):Play()
+		TweenService:Create(st, info, { Transparency = 1 }):Play()
+		task.wait(0.45)
+		f:Destroy()
+	end)
+end
 
-local jugadorFrame = Instance.new("Frame")
-jugadorFrame.Size = UDim2.new(1, 0, 1, 0)
-jugadorFrame.BackgroundTransparency = 1
-jugadorFrame.Parent = content
+-- ====================== FEATURE LOGIC ======================
+-- No Clip (remembers which parts it changed so it can restore them)
+local noclipChanged = setmetatable({}, { __mode = "k" })
+local function restoreNoclip()
+	for part in pairs(noclipChanged) do
+		if part and part.Parent then
+			part.CanCollide = true
+		end
+	end
+	table.clear(noclipChanged)
+end
 
-local proxFrame = Instance.new("Frame")
-proxFrame.Size = UDim2.new(1, 0, 1, 0)
-proxFrame.BackgroundTransparency = 1
-proxFrame.Visible = false
-proxFrame.Parent = content
+track(RunService.Stepped:Connect(function()
+	if S.noclip then
+		local c = player.Character
+		if c then
+			for _, v in ipairs(c:GetDescendants()) do
+				if v:IsA("BasePart") and v.CanCollide then
+					noclipChanged[v] = true
+					v.CanCollide = false
+				end
+			end
+		end
+	end
+end))
 
-local soon = Instance.new("TextLabel")
-soon.Size = UDim2.new(1, 0, 1, 0)
-soon.BackgroundTransparency = 1
-soon.Text = "Más opciones\npróximamente..."
-soon.TextColor3 = GRAY
-soon.TextScaled = true
-soon.Font = Enum.Font.Gotham
-soon.Parent = proxFrame
+-- Infinite Jump
+track(UserInputService.JumpRequest:Connect(function()
+	if S.infJump then
+		local hum = getHum()
+		if hum then
+			hum:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
+	end
+end))
 
--- Botones bonitos
-local function makeButton(text, y)
-	local b = Instance.new("TextButton")
-	b.Size = UDim2.new(1, 0, 0, 52)
-	b.Position = UDim2.new(0, 0, 0, y)
-	b.BackgroundColor3 = BG2
-	b.Text = text
-	b.TextColor3 = TEXT
-	b.Font = Enum.Font.GothamMedium
-	b.TextSize = 17
-	b.AutoButtonColor = false
-	b.Parent = jugadorFrame
+-- Fly (self-contained, works with keyboard and mobile joystick)
+local flyBV, flyBG
+local flyUp, flyDown = false, false
 
-	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 11)
+local function stopFly()
+	if flyBV then flyBV:Destroy() flyBV = nil end
+	if flyBG then flyBG:Destroy() flyBG = nil end
+	local hum = getHum()
+	if hum then
+		hum.PlatformStand = false
+	end
+end
 
-	local s = Instance.new("UIStroke", b)
-	s.Color = Color3.fromRGB(60, 60, 85)
-	s.Thickness = 1.2
+local function startFly()
+	local root, hum = getRoot(), getHum()
+	if not root or not hum then return false end
+	stopFly()
+	flyBV = new("BodyVelocity", {
+		MaxForce = Vector3.new(1e9, 1e9, 1e9),
+		Velocity = Vector3.zero,
+	}, root)
+	flyBG = new("BodyGyro", {
+		MaxTorque = Vector3.new(1e9, 1e9, 1e9),
+		P = 9e4,
+		CFrame = root.CFrame,
+	}, root)
+	hum.PlatformStand = true
+	return true
+end
 
-	-- Efecto hover
+track(RunService.RenderStepped:Connect(function()
+	local cam = Workspace.CurrentCamera
+
+	if S.fov and cam then
+		cam.FieldOfView = S.fov
+	end
+
+	if not S.fly then return end
+	local root, hum = getRoot(), getHum()
+	if not (root and hum and cam) then return end
+	if not flyBV or not flyBV.Parent then
+		if not startFly() then return end
+	end
+
+	local dir = Vector3.zero
+	if hum.MoveDirection.Magnitude > 0 then
+		local rel = cam.CFrame:VectorToObjectSpace(hum.MoveDirection)
+		dir = cam.CFrame.LookVector * (-rel.Z) + cam.CFrame.RightVector * rel.X
+	end
+	local up = Vector3.new(0, 1, 0)
+	if UserInputService:IsKeyDown(Enum.KeyCode.Space) or UserInputService:IsKeyDown(Enum.KeyCode.E) or flyUp then
+		dir += up
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or flyDown then
+		dir -= up
+	end
+	if dir.Magnitude > 0 then
+		dir = dir.Unit
+	end
+
+	flyBV.Velocity = dir * S.flySpeed
+	flyBG.CFrame = cam.CFrame
+end))
+
+-- Speed / jump / lighting enforcement (some games reset these constantly)
+track(RunService.Heartbeat:Connect(function()
+	local hum = getHum()
+	if hum then
+		if S.speedOn then
+			hum.WalkSpeed = S.speed
+		end
+		if S.jumpOn then
+			hum.UseJumpPower = true
+			hum.JumpPower = S.jump
+		end
+	end
+	if S.fullbright then
+		Lighting.Brightness = 2
+		Lighting.Ambient = Color3.fromRGB(190, 190, 190)
+		Lighting.OutdoorAmbient = Color3.fromRGB(190, 190, 190)
+		Lighting.GlobalShadows = false
+	end
+	if S.noFog then
+		Lighting.FogEnd = 1e6
+	end
+end))
+
+-- Anti-AFK
+track(player.Idled:Connect(function()
+	if S.antiAfk then
+		VirtualUser:CaptureController()
+		VirtualUser:ClickButton2(Vector2.new())
+	end
+end))
+
+-- ====================== MAIN PANEL ======================
+local cam0 = Workspace.CurrentCamera
+local vp = cam0 and cam0.ViewportSize or Vector2.new(800, 600)
+local W = math.min(380, vp.X - 24)
+local H = math.min(440, vp.Y - 40)
+local FULL_SIZE = UDim2.new(0, W, 0, H)
+
+local main = new("Frame", {
+	Size = FULL_SIZE,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.new(0.5, 0, 0.5, 0),
+	BorderSizePixel = 0,
+	Active = true,
+	ClipsDescendants = true,
+	Visible = false,
+}, gui)
+corner(main, 16)
+local mainStroke = stroke(main, 2.5)
+bind(function()
+	main.BackgroundColor3 = T.bg
+	if not S.rainbow then
+		mainStroke.Color = T.accent
+	end
+end)
+
+-- Top bar (drag handle)
+local topBar = new("Frame", { Size = UDim2.new(1, 0, 0, 40), BorderSizePixel = 0 }, main)
+bind(function() topBar.BackgroundColor3 = T.bg2 end)
+
+local titleLbl = new("TextLabel", {
+	Size = UDim2.new(1, -90, 1, 0),
+	Position = UDim2.new(0, 14, 0, 0),
+	BackgroundTransparency = 1,
+	Text = "KingOS  •  Universal v2",
+	Font = Enum.Font.GothamBold,
+	TextSize = 16,
+	TextXAlignment = Enum.TextXAlignment.Left,
+}, topBar)
+bind(function() titleLbl.TextColor3 = T.text end)
+
+local function topButton(text, xOffset)
+	local b = new("TextButton", {
+		Size = UDim2.new(0, 28, 0, 28),
+		Position = UDim2.new(1, xOffset, 0.5, -14),
+		Text = text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 16,
+		AutoButtonColor = false,
+	}, topBar)
+	corner(b, 8)
+	bind(function()
+		b.BackgroundColor3 = T.bg3
+		b.TextColor3 = T.text
+	end)
+	return b
+end
+local minBtn = topButton("–", -70)
+local closeBtn = topButton("X", -36)
+
+-- Body
+local body = new("Frame", {
+	Size = UDim2.new(1, 0, 1, -40),
+	Position = UDim2.new(0, 0, 0, 40),
+	BackgroundTransparency = 1,
+}, main)
+
+local tabBar = new("ScrollingFrame", {
+	Size = UDim2.new(1, -16, 0, 34),
+	Position = UDim2.new(0, 8, 0, 6),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 0,
+	CanvasSize = UDim2.new(),
+	AutomaticCanvasSize = Enum.AutomaticSize.X,
+	ScrollingDirection = Enum.ScrollingDirection.X,
+}, body)
+new("UIListLayout", {
+	FillDirection = Enum.FillDirection.Horizontal,
+	Padding = UDim.new(0, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+}, tabBar)
+
+local pages, tabBtns = {}, {}
+local activeTab = "Player"
+
+local function showPage(name)
+	activeTab = name
+	for n, p in pairs(pages) do
+		p.Visible = (n == name)
+	end
+	refreshAll()
+end
+
+local function createPage(name)
+	local p = new("ScrollingFrame", {
+		Size = UDim2.new(1, -16, 1, -52),
+		Position = UDim2.new(0, 8, 0, 46),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 3,
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		Visible = false,
+	}, body)
+	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }, p)
+	new("UIPadding", { PaddingBottom = UDim.new(0, 10), PaddingRight = UDim.new(0, 6) }, p)
+	pages[name] = p
+	bind(function() p.ScrollBarImageColor3 = T.accent end)
+
+	local b = new("TextButton", {
+		Size = UDim2.new(0, 84, 1, 0),
+		Text = name,
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+		AutoButtonColor = false,
+		LayoutOrder = nextOrder(),
+	}, tabBar)
+	corner(b, 9)
+	tabBtns[name] = b
+	b.MouseButton1Click:Connect(function() showPage(name) end)
+	bind(function()
+		local active = (activeTab == name)
+		b.BackgroundColor3 = active and T.accent or T.bg2
+		b.TextColor3 = active and T.onAccent or T.gray
+	end)
+	return p
+end
+
+-- ====================== UI COMPONENTS ======================
+local function addLabel(page, text)
+	local l = new("TextLabel", {
+		Size = UDim2.new(1, 0, 0, 22),
+		BackgroundTransparency = 1,
+		Text = text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 13,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		LayoutOrder = nextOrder(),
+	}, page)
+	bind(function() l.TextColor3 = T.accent end)
+	return l
+end
+
+local function row(page, h)
+	local f = new("Frame", {
+		Size = UDim2.new(1, 0, 0, h),
+		BorderSizePixel = 0,
+		LayoutOrder = nextOrder(),
+	}, page)
+	corner(f, 10)
+	local s = stroke(f, 1)
+	bind(function()
+		f.BackgroundColor3 = T.bg2
+		s.Color = T.bg3
+	end)
+	return f
+end
+
+local function addToggle(page, text, default, callback)
+	local f = row(page, 44)
+	local lbl = new("TextLabel", {
+		Size = UDim2.new(1, -70, 1, 0),
+		Position = UDim2.new(0, 12, 0, 0),
+		BackgroundTransparency = 1,
+		Text = text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	}, f)
+	local pill = new("TextButton", {
+		Size = UDim2.new(0, 44, 0, 22),
+		Position = UDim2.new(1, -56, 0.5, -11),
+		Text = "",
+		AutoButtonColor = false,
+	}, f)
+	corner(pill, 11)
+	local knob = new("Frame", {
+		Size = UDim2.new(0, 16, 0, 16),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BorderSizePixel = 0,
+	}, pill)
+	corner(knob, 8)
+
+	local state = default
+	local function render(animate)
+		pill.BackgroundColor3 = state and T.accent or T.bg3
+		local pos = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+		if animate then
+			TweenService:Create(knob, TweenInfo.new(0.15), { Position = pos }):Play()
+		else
+			knob.Position = pos
+		end
+	end
+	bind(function()
+		lbl.TextColor3 = T.text
+		render(false)
+	end)
+
+	local api = {}
+	function api.set(v)
+		state = v
+		render(true)
+		callback(v)
+	end
+	pill.MouseButton1Click:Connect(function()
+		api.set(not state)
+	end)
+	return api
+end
+
+local function addSlider(page, text, min, max, default, callback)
+	local f = row(page, 58)
+	local lbl = new("TextLabel", {
+		Size = UDim2.new(1, -80, 0, 26),
+		Position = UDim2.new(0, 12, 0, 4),
+		BackgroundTransparency = 1,
+		Text = text,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	}, f)
+	local valLbl = new("TextLabel", {
+		Size = UDim2.new(0, 60, 0, 26),
+		Position = UDim2.new(1, -72, 0, 4),
+		BackgroundTransparency = 1,
+		Text = tostring(default),
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	}, f)
+	local hit = new("TextButton", {
+		Size = UDim2.new(1, -24, 0, 26),
+		Position = UDim2.new(0, 12, 0, 28),
+		BackgroundTransparency = 1,
+		Text = "",
+		AutoButtonColor = false,
+	}, f)
+	local bar = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 8),
+		Position = UDim2.new(0, 0, 0.5, -4),
+		BorderSizePixel = 0,
+	}, hit)
+	corner(bar, 4)
+	local fill = new("Frame", {
+		Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+		BorderSizePixel = 0,
+	}, bar)
+	corner(fill, 4)
+
+	bind(function()
+		lbl.TextColor3 = T.text
+		valLbl.TextColor3 = T.accent
+		bar.BackgroundColor3 = T.bg3
+		fill.BackgroundColor3 = T.accent
+	end)
+
+	local dragging = false
+	local function setFromX(x)
+		local rel = math.clamp((x - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
+		local val = math.floor(min + (max - min) * rel + 0.5)
+		fill.Size = UDim2.new(rel, 0, 1, 0)
+		valLbl.Text = tostring(val)
+		callback(val)
+	end
+	hit.InputBegan:Connect(function(input)
+		if isPointer(input) then
+			dragging = true
+			page.ScrollingEnabled = false
+			setFromX(input.Position.X)
+		end
+	end)
+	track(UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch) then
+			setFromX(input.Position.X)
+		end
+	end))
+	track(UserInputService.InputEnded:Connect(function(input)
+		if dragging and isPointer(input) then
+			dragging = false
+			page.ScrollingEnabled = true
+		end
+	end))
+end
+
+local function addButton(page, text, callback)
+	local b = new("TextButton", {
+		Size = UDim2.new(1, 0, 0, 42),
+		Text = text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		AutoButtonColor = false,
+		LayoutOrder = nextOrder(),
+	}, page)
+	corner(b, 10)
+	bind(function()
+		b.BackgroundColor3 = T.bg3
+		b.TextColor3 = T.text
+	end)
 	b.MouseEnter:Connect(function()
-		TweenService:Create(b, TweenInfo.new(0.18), {BackgroundColor3 = Color3.fromRGB(40, 40, 60)}):Play()
-		TweenService:Create(s, TweenInfo.new(0.18), {Color = PRIMARY}):Play()
+		TweenService:Create(b, TweenInfo.new(0.15), { BackgroundColor3 = T.accent, TextColor3 = T.onAccent }):Play()
 	end)
 	b.MouseLeave:Connect(function()
-		TweenService:Create(b, TweenInfo.new(0.18), {BackgroundColor3 = BG2}):Play()
-		TweenService:Create(s, TweenInfo.new(0.18), {Color = Color3.fromRGB(60, 60, 85)}):Play()
+		TweenService:Create(b, TweenInfo.new(0.15), { BackgroundColor3 = T.bg3, TextColor3 = T.text }):Play()
 	end)
-
+	b.MouseButton1Click:Connect(callback)
 	return b
 end
 
-local noClipBtn = makeButton("No Clip", 0)
-local velocidadBtn = makeButton("Velocidad", 64)
-local flyBtn = makeButton("Fly", 128)
+-- ====================== PAGES ======================
+local playerPage = createPage("Player")
+local worldPage = createPage("World")
+local themesPage = createPage("Themes")
+local miscPage = createPage("Misc")
 
--- ====================== VENTANA VELOCIDAD ======================
-local speedWin = Instance.new("Frame")
-speedWin.Size = UDim2.new(0, 290, 0, 190)
-speedWin.Position = UDim2.new(0.5, -145, 0.5, -95)
-speedWin.BackgroundColor3 = BG
-speedWin.Visible = false
-speedWin.ZIndex = 30
-speedWin.Parent = screenGui
-Instance.new("UICorner", speedWin).CornerRadius = UDim.new(0, 14)
-local swStroke = Instance.new("UIStroke", speedWin)
-swStroke.Color = PRIMARY
-swStroke.Thickness = 2
+-- ---- Player ----
+addLabel(playerPage, "MOVEMENT")
+addToggle(playerPage, "Speed Boost", false, function(v)
+	S.speedOn = v
+	if not v then
+		local hum = getHum()
+		if hum then hum.WalkSpeed = origWalk end
+	end
+end)
+addSlider(playerPage, "Walk Speed", 1, 300, S.speed, function(v) S.speed = v end)
 
-local swTitle = Instance.new("TextLabel")
-swTitle.Size = UDim2.new(1, 0, 0, 42)
-swTitle.BackgroundTransparency = 1
-swTitle.Text = "Ponga su velocidad aquí"
-swTitle.TextColor3 = TEXT
-swTitle.Font = Enum.Font.GothamBold
-swTitle.TextSize = 17
-swTitle.Parent = speedWin
+addToggle(playerPage, "High Jump", false, function(v)
+	S.jumpOn = v
+	if not v then
+		local hum = getHum()
+		if hum then hum.JumpPower = origJump end
+	end
+end)
+addSlider(playerPage, "Jump Power", 1, 300, S.jump, function(v) S.jump = v end)
 
-local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(0.84, 0, 0, 44)
-speedBox.Position = UDim2.new(0.08, 0, 0, 55)
-speedBox.BackgroundColor3 = BG2
-speedBox.Text = "16"
-speedBox.TextColor3 = TEXT
-speedBox.PlaceholderText = "Ejemplo: 50"
-speedBox.Font = Enum.Font.Gotham
-speedBox.TextSize = 20
-speedBox.Parent = speedWin
-Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 9)
+addToggle(playerPage, "Infinite Jump", false, function(v) S.infJump = v end)
+addToggle(playerPage, "No Clip", false, function(v)
+	S.noclip = v
+	if not v then restoreNoclip() end
+end)
 
-local actBtn = Instance.new("TextButton")
-actBtn.Size = UDim2.new(0.4, 0, 0, 42)
-actBtn.Position = UDim2.new(0.08, 0, 0, 120)
-actBtn.BackgroundColor3 = Color3.fromRGB(30, 150, 70)
-actBtn.Text = "Activar"
-actBtn.TextColor3 = TEXT
-actBtn.Font = Enum.Font.GothamBold
-actBtn.TextSize = 16
-actBtn.Parent = speedWin
-Instance.new("UICorner", actBtn).CornerRadius = UDim.new(0, 9)
+addLabel(playerPage, "FLIGHT")
+local flyPad -- on-screen up/down buttons (mobile)
+addToggle(playerPage, "Fly", false, function(v)
+	S.fly = v
+	if v then
+		if not startFly() then
+			notify("Fly: no character found")
+		end
+	else
+		stopFly()
+		flyUp, flyDown = false, false
+	end
+	if flyPad then flyPad.Visible = v end
+end)
+addSlider(playerPage, "Fly Speed", 10, 300, S.flySpeed, function(v) S.flySpeed = v end)
+addButton(playerPage, "Reset Character", function()
+	local hum = getHum()
+	if hum then hum.Health = 0 end
+end)
 
-local deactBtn = Instance.new("TextButton")
-deactBtn.Size = UDim2.new(0.4, 0, 0, 42)
-deactBtn.Position = UDim2.new(0.52, 0, 0, 120)
-deactBtn.BackgroundColor3 = Color3.fromRGB(160, 40, 40)
-deactBtn.Text = "Desactivar"
-deactBtn.TextColor3 = TEXT
-deactBtn.Font = Enum.Font.GothamBold
-deactBtn.TextSize = 16
-deactBtn.Parent = speedWin
-Instance.new("UICorner", deactBtn).CornerRadius = UDim.new(0, 9)
+-- ---- World ----
+addLabel(worldPage, "ENVIRONMENT")
+addSlider(worldPage, "Gravity", 0, 400, math.floor(origGravity + 0.5), function(v)
+	Workspace.Gravity = v
+end)
+addButton(worldPage, "Reset Gravity", function()
+	Workspace.Gravity = origGravity
+	notify("Gravity reset")
+end)
+addSlider(worldPage, "Time of Day", 0, 24, math.floor(Lighting.ClockTime), function(v)
+	Lighting.ClockTime = v
+end)
+addToggle(worldPage, "Fullbright", false, function(v)
+	S.fullbright = v
+	if not v then restoreLight({ "Brightness", "Ambient", "OutdoorAmbient", "GlobalShadows" }) end
+end)
+addToggle(worldPage, "Remove Fog", false, function(v)
+	S.noFog = v
+	if not v then restoreLight({ "FogEnd" }) end
+end)
 
--- ====================== LÓGICA ======================
-local noClipOn = false
-local char, hum
+addLabel(worldPage, "CAMERA")
+addSlider(worldPage, "Field of View", 30, 120, 70, function(v) S.fov = v end)
+addButton(worldPage, "Reset FOV", function()
+	S.fov = nil
+	local cam = Workspace.CurrentCamera
+	if cam then cam.FieldOfView = 70 end
+	notify("FOV reset")
+end)
 
-local function refreshChar()
-	char = player.Character or player.CharacterAdded:Wait()
-	hum = char:WaitForChild("Humanoid")
+-- ---- Themes ----
+addLabel(themesPage, "CHOOSE A THEME")
+for _, name in ipairs(THEME_ORDER) do
+	local f = row(themesPage, 44)
+	local sw = new("Frame", {
+		Size = UDim2.new(0, 22, 0, 22),
+		Position = UDim2.new(0, 12, 0.5, -11),
+		BackgroundColor3 = THEMES[name].accent,
+		BorderSizePixel = 0,
+	}, f)
+	corner(sw, 11)
+	local lbl = new("TextLabel", {
+		Size = UDim2.new(1, -100, 1, 0),
+		Position = UDim2.new(0, 44, 0, 0),
+		BackgroundTransparency = 1,
+		Text = name,
+		Font = Enum.Font.GothamMedium,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	}, f)
+	local check = new("TextLabel", {
+		Size = UDim2.new(0, 30, 1, 0),
+		Position = UDim2.new(1, -40, 0, 0),
+		BackgroundTransparency = 1,
+		Text = "✓",
+		Font = Enum.Font.GothamBold,
+		TextSize = 18,
+	}, f)
+	local click = new("TextButton", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+	}, f)
+	click.MouseButton1Click:Connect(function()
+		applyTheme(name)
+		notify("Theme: " .. name)
+	end)
+	bind(function()
+		lbl.TextColor3 = T.text
+		check.TextColor3 = T.accent
+		check.Visible = (currentTheme == name)
+	end)
 end
 
-player.CharacterAdded:Connect(function()
-	task.wait(0.4)
-	refreshChar()
-	if noClipOn then
-		for _, v in pairs(char:GetDescendants()) do
-			if v:IsA("BasePart") then
-				v.CanCollide = false
-			end
-		end
+addLabel(themesPage, "EXTRAS")
+addToggle(themesPage, "Rainbow Border", false, function(v)
+	S.rainbow = v
+	if not v then refreshAll() end
+end)
+addSlider(themesPage, "Panel Transparency %", 0, 60, 0, function(v)
+	main.BackgroundTransparency = v / 100
+end)
+
+track(RunService.Heartbeat:Connect(function()
+	if S.rainbow then
+		mainStroke.Color = Color3.fromHSV((tick() % 5) / 5, 0.8, 1)
 	end
-end)
+end))
 
--- No Clip
-noClipBtn.MouseButton1Click:Connect(function()
-	refreshChar()
-	noClipOn = not noClipOn
-
-	if noClipOn then
-		noClipBtn.Text = "No Clip  [ON]"
-		noClipBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 60)
-		for _, v in pairs(char:GetDescendants()) do
-			if v:IsA("BasePart") then
-				v.CanCollide = false
-			end
-		end
-	else
-		noClipBtn.Text = "No Clip"
-		noClipBtn.BackgroundColor3 = BG2
-		for _, v in pairs(char:GetDescendants()) do
-			if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
-				v.CanCollide = true
-			end
-		end
-	end
-end)
-
-RunService.Stepped:Connect(function()
-	if noClipOn and char then
-		for _, v in pairs(char:GetDescendants()) do
-			if v:IsA("BasePart") then
-				v.CanCollide = false
-			end
-		end
-	end
-end)
-
--- Velocidad
-velocidadBtn.MouseButton1Click:Connect(function()
-	speedWin.Visible = not speedWin.Visible
-end)
-
-actBtn.MouseButton1Click:Connect(function()
-	refreshChar()
-	local num = tonumber(speedBox.Text)
-	if num and num > 0 then
-		hum.WalkSpeed = num
-		speedWin.Visible = false
-	end
-end)
-
-deactBtn.MouseButton1Click:Connect(function()
-	refreshChar()
-	hum.WalkSpeed = 16
-	speedWin.Visible = false
-end)
-
--- ====================== FLY (Homelander Script) ======================
-flyBtn.MouseButton1Click:Connect(function()
-	flyBtn.Text = "Cargando..."
-	local success, err = pcall(function()
-		loadstring(game:HttpGet("https://scriptblox.com/raw/Universal-Script-Homelander-script-242112"))()
-	end)
-	if success then
-		flyBtn.Text = "Fly  ✓"
-	else
-		flyBtn.Text = "Error"
-		warn("Error al cargar Homelander:", err)
-	end
-	task.delay(2, function()
-		flyBtn.Text = "Fly"
+-- ---- Misc ----
+addLabel(miscPage, "UTILITIES")
+addToggle(miscPage, "Anti-AFK", true, function(v) S.antiAfk = v end)
+addButton(miscPage, "Rejoin Server", function()
+	notify("Rejoining...")
+	pcall(function()
+		TeleportService:Teleport(game.PlaceId, player)
 	end)
 end)
 
--- Pestañas
-tabJugador.MouseButton1Click:Connect(function()
-	jugadorFrame.Visible = true
-	proxFrame.Visible = false
-	tabJugador.BackgroundColor3 = PRIMARY
-	tabJugador.TextColor3 = TEXT
-	tabProx.BackgroundColor3 = BG2
-	tabProx.TextColor3 = GRAY
+local unload -- defined below
+addButton(miscPage, "Unload KingOS", function()
+	unload()
 end)
 
-tabProx.MouseButton1Click:Connect(function()
-	jugadorFrame.Visible = false
-	proxFrame.Visible = true
-	tabProx.BackgroundColor3 = PRIMARY
-	tabProx.TextColor3 = TEXT
-	tabJugador.BackgroundColor3 = BG2
-	tabJugador.TextColor3 = GRAY
+addLabel(miscPage, "INFO")
+local infoRow = row(miscPage, 96)
+local infoLbl = new("TextLabel", {
+	Size = UDim2.new(1, -24, 1, -12),
+	Position = UDim2.new(0, 12, 0, 6),
+	BackgroundTransparency = 1,
+	Text = "KingOS Universal v2.0\nOWN GAME BY KING OS\n\nRightShift or the K button hides/shows the panel. Fly: joystick/WASD, Space/E up, Q/Ctrl down.",
+	Font = Enum.Font.Gotham,
+	TextSize = 13,
+	TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+}, infoRow)
+bind(function() infoLbl.TextColor3 = T.gray end)
+
+-- ====================== FLY UP/DOWN PAD (mobile) ======================
+flyPad = new("Frame", {
+	Size = UDim2.new(0, 60, 0, 128),
+	Position = UDim2.new(1, -76, 0.5, -64),
+	BackgroundTransparency = 1,
+	Visible = false,
+}, gui)
+local function padButton(text, y, setter)
+	local b = new("TextButton", {
+		Size = UDim2.new(1, 0, 0, 60),
+		Position = UDim2.new(0, 0, 0, y),
+		Text = text,
+		Font = Enum.Font.GothamBold,
+		TextSize = 26,
+		AutoButtonColor = false,
+		BackgroundTransparency = 0.25,
+	}, flyPad)
+	corner(b, 14)
+	bind(function()
+		b.BackgroundColor3 = T.accent
+		b.TextColor3 = T.onAccent
+	end)
+	b.InputBegan:Connect(function(input)
+		if isPointer(input) then setter(true) end
+	end)
+	b.InputEnded:Connect(function(input)
+		if isPointer(input) then setter(false) end
+	end)
+end
+padButton("▲", 0, function(v) flyUp = v end)
+padButton("▼", 68, function(v) flyDown = v end)
+
+-- ====================== FLOATING "K" BUTTON ======================
+local floatBtn = new("TextButton", {
+	Size = UDim2.new(0, 46, 0, 46),
+	Position = UDim2.new(0, 10, 0.5, -23),
+	Text = "K",
+	Font = Enum.Font.GothamBold,
+	TextSize = 22,
+	AutoButtonColor = false,
+	Visible = false,
+}, gui)
+corner(floatBtn, 23)
+local floatStroke = stroke(floatBtn, 2)
+bind(function()
+	floatBtn.BackgroundColor3 = T.bg
+	floatBtn.TextColor3 = T.accent
+	floatStroke.Color = T.accent
+end)
+floatBtn.MouseButton1Click:Connect(function()
+	main.Visible = not main.Visible
 end)
 
--- ====================== ARRASTRAR PANEL ======================
-local dragging = false
-local dragStart, startPos
+-- ====================== TOP BAR BEHAVIOR ======================
+local minimized = false
+minBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	body.Visible = not minimized
+	TweenService:Create(main, TweenInfo.new(0.2), {
+		Size = minimized and UDim2.new(0, W, 0, 40) or FULL_SIZE,
+	}):Play()
+end)
+closeBtn.MouseButton1Click:Connect(function()
+	main.Visible = false
+	notify("Hidden. Tap K or press RightShift")
+end)
 
+track(UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.RightShift then
+		main.Visible = not main.Visible
+	end
+end))
+
+-- Dragging
+local dragging, dragStart, startPos = false, nil, nil
 topBar.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+	if isPointer(input) then
 		dragging = true
 		dragStart = input.Position
-		startPos = mainPanel.Position
+		startPos = main.Position
 	end
 end)
-
 topBar.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		dragging = false
-	end
+	if isPointer(input) then dragging = false end
 end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+track(UserInputService.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+		or input.UserInputType == Enum.UserInputType.Touch) then
 		local delta = input.Position - dragStart
-		mainPanel.Position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + delta.X,
-			startPos.Y.Scale,
-			startPos.Y.Offset + delta.Y
+		main.Position = UDim2.new(
+			startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y
 		)
 	end
-end)
+end))
 
--- ====================== EFECTO POLVITO ======================
+-- ====================== UNLOAD ======================
+unload = function()
+	S.fly = false
+	stopFly()
+	S.noclip = false
+	restoreNoclip()
+	S.fullbright, S.noFog, S.fov = false, false, nil
+	restoreLight({ "Brightness", "Ambient", "OutdoorAmbient", "GlobalShadows", "FogEnd" })
+	Workspace.Gravity = origGravity
+	local hum = getHum()
+	if hum then
+		hum.WalkSpeed = origWalk
+		hum.JumpPower = origJump
+		hum.PlatformStand = false
+	end
+	for _, c in ipairs(conns) do
+		pcall(function() c:Disconnect() end)
+	end
+	gui:Destroy()
+	env.KingOS_Unload = nil
+end
+env.KingOS_Unload = unload
+
+-- ====================== INTRO ======================
+local intro = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1 }, gui)
+local introLabel = new("TextLabel", {
+	Size = UDim2.new(0.9, 0, 0.2, 0),
+	Position = UDim2.new(0.05, 0, 0.4, 0),
+	BackgroundTransparency = 1,
+	Text = "KingOS Universal v2\nOWN GAME BY KING OS",
+	TextColor3 = Color3.fromRGB(255, 255, 255),
+	TextScaled = true,
+	Font = Enum.Font.GothamBold,
+	TextStrokeTransparency = 0.3,
+	TextTransparency = 1,
+}, intro)
+
 local function dust(parent, pos)
-	local p = Instance.new("Frame")
-	p.Size = UDim2.new(0, math.random(5, 12), 0, math.random(5, 12))
-	p.Position = pos
-	p.BackgroundColor3 = Color3.fromRGB(math.random(160, 255), math.random(100, 200), math.random(220, 255))
-	p.BorderSizePixel = 0
-	p.BackgroundTransparency = 0.1
-	p.Parent = parent
-	Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
-
-	local goal = {
+	local p = new("Frame", {
+		Size = UDim2.new(0, math.random(5, 12), 0, math.random(5, 12)),
+		Position = pos,
+		BackgroundColor3 = T.accent:Lerp(Color3.new(1, 1, 1), math.random() * 0.6),
+		BorderSizePixel = 0,
+		BackgroundTransparency = 0.1,
+	}, parent)
+	corner(p, 6)
+	local tw = TweenService:Create(p, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		Position = UDim2.new(pos.X.Scale + (math.random() - 0.5) * 0.75, 0, pos.Y.Scale + (math.random() - 0.5) * 0.6, 0),
 		BackgroundTransparency = 1,
-		Size = UDim2.new(0, 2, 0, 2)
-	}
-	local tw = TweenService:Create(p, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal)
+		Size = UDim2.new(0, 2, 0, 2),
+	})
 	tw:Play()
 	tw.Completed:Connect(function() p:Destroy() end)
 end
 
+showPage("Player")
+
 task.spawn(function()
-	task.wait(5)
-
-	for i = 1, 45 do
-		dust(introFrame, UDim2.new(0.1 + math.random() * 0.8, 0, 0.3 + math.random() * 0.4, 0))
+	TweenService:Create(introLabel, TweenInfo.new(0.5), { TextTransparency = 0 }):Play()
+	task.wait(2)
+	for _ = 1, 40 do
+		dust(intro, UDim2.new(0.1 + math.random() * 0.8, 0, 0.3 + math.random() * 0.4, 0))
 	end
-
 	local fade = TweenService:Create(introLabel, TweenInfo.new(0.8), {
 		TextTransparency = 1,
-		TextStrokeTransparency = 1
+		TextStrokeTransparency = 1,
 	})
 	fade:Play()
 	fade.Completed:Wait()
-	introFrame:Destroy()
+	intro:Destroy()
 
-	mainPanel.Visible = true
-	mainPanel.BackgroundTransparency = 1
-	TweenService:Create(mainPanel, TweenInfo.new(0.5), {BackgroundTransparency = 0}):Play()
+	main.Visible = true
+	floatBtn.Visible = true
+	notify("KingOS v2 loaded • RightShift hides/shows")
 end)
 
-print("✅ KingOS Universal cargado")
+print("✅ KingOS Universal v2 loaded")
